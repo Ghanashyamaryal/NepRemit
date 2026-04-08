@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { Lock, Eye, EyeOff, AlertCircle, CheckCircle2, ArrowRight, Check } from "lucide-react";
 import { Header } from "@/components/organisms/Header";
 import { Footer } from "@/components/organisms/Footer";
@@ -19,8 +20,7 @@ const passwordRequirements = [
 
 export default function ResetPasswordPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token");
+  const supabase = createClient();
 
   const [showPassword, setShowPassword] = React.useState(false);
   const [password, setPassword] = React.useState("");
@@ -33,11 +33,6 @@ export default function ResetPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!token) {
-      setError("Invalid or missing reset token. Please request a new password reset.");
-      return;
-    }
 
     if (password !== confirmPassword) {
       setError("Passwords don't match");
@@ -54,61 +49,23 @@ export default function ResetPasswordPage() {
     setError(null);
 
     try {
-      const response = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ token, password }),
+      const { error } = await supabase.auth.updateUser({
+        password,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || "Failed to reset password. Please try again.");
+      if (error) {
+        setError(error.message);
         setIsLoading(false);
         return;
       }
 
       setSuccess(true);
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
-
-  // Invalid token state
-  if (!token) {
-    return (
-      <div className="flex min-h-screen flex-col bg-neutral-50">
-        <Header />
-
-        <main className="flex-1 flex items-center justify-center py-12 px-4">
-          <div className="w-full max-w-md">
-            <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-8">
-              <div className="text-center">
-                <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-red-100 mb-4">
-                  <AlertCircle className="h-7 w-7 text-red-600" />
-                </div>
-                <h1 className="text-2xl font-bold text-neutral-900 mb-2">
-                  Invalid Reset Link
-                </h1>
-                <p className="text-neutral-600 mb-6">
-                  This password reset link is invalid or has expired. Please request a new one.
-                </p>
-                <Button asChild className="w-full">
-                  <Link href="/forgot-password">Request New Link</Link>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </main>
-
-        <Footer />
-      </div>
-    );
-  }
 
   return (
     <div className="flex min-h-screen flex-col bg-neutral-50">

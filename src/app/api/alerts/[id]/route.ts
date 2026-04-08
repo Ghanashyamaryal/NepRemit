@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { connectDB } from "@/lib/mongodb";
-import { RateAlert } from "@/models/RateAlert";
+import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
 const updateAlertSchema = z.object({
@@ -16,20 +14,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
 
-    await connectDB();
+    const { data: alert, error } = await supabase
+      .from("rate_alerts")
+      .select("*")
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-    const alert = await RateAlert.findOne({
-      _id: id,
-      userId: session.user.id,
-    });
+    if (error) throw error;
 
     if (!alert) {
       return NextResponse.json({ error: "Alert not found" }, { status: 404 });
@@ -51,9 +52,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -68,13 +70,21 @@ export async function PATCH(
       );
     }
 
-    await connectDB();
+    // Map camelCase to snake_case
+    const updateData: Record<string, unknown> = {};
+    if (validation.data.targetRate !== undefined) updateData.target_rate = validation.data.targetRate;
+    if (validation.data.direction !== undefined) updateData.direction = validation.data.direction;
+    if (validation.data.isActive !== undefined) updateData.is_active = validation.data.isActive;
 
-    const alert = await RateAlert.findOneAndUpdate(
-      { _id: id, userId: session.user.id },
-      { $set: validation.data },
-      { new: true }
-    );
+    const { data: alert, error } = await supabase
+      .from("rate_alerts")
+      .update(updateData)
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .select()
+      .maybeSingle();
+
+    if (error) throw error;
 
     if (!alert) {
       return NextResponse.json({ error: "Alert not found" }, { status: 404 });
@@ -96,20 +106,24 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
 
-    await connectDB();
+    const { data: alert, error } = await supabase
+      .from("rate_alerts")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .select()
+      .maybeSingle();
 
-    const alert = await RateAlert.findOneAndDelete({
-      _id: id,
-      userId: session.user.id,
-    });
+    if (error) throw error;
 
     if (!alert) {
       return NextResponse.json({ error: "Alert not found" }, { status: 404 });

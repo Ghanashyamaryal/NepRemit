@@ -3,8 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, AlertCircle, Check } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight, AlertCircle, Check, CheckCircle2, ArrowLeft } from "lucide-react";
 import { Header } from "@/components/organisms/Header";
 import { Footer } from "@/components/organisms/Footer";
 import { Button } from "@/components/atoms/Button";
@@ -43,6 +43,8 @@ const passwordRequirements = [
 
 export default function RegisterPage() {
   const router = useRouter();
+  const supabase = createClient();
+
   const [showPassword, setShowPassword] = React.useState(false);
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -52,13 +54,20 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [emailSent, setEmailSent] = React.useState(false);
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     setError(null);
     try {
-      await signIn("google", { callbackUrl: "/dashboard" });
-    } catch (err) {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+        },
+      });
+      if (error) throw error;
+    } catch {
       setError("Failed to sign up with Google. Please try again.");
       setIsGoogleLoading(false);
     }
@@ -72,7 +81,6 @@ export default function RegisterPage() {
       return;
     }
 
-    // Check all password requirements
     const allRequirementsMet = passwordRequirements.every((req) => req.test(password));
     if (!allRequirementsMet) {
       setError("Please meet all password requirements");
@@ -83,37 +91,27 @@ export default function RegisterPage() {
     setError(null);
 
     try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+            name: name,
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
         },
-        body: JSON.stringify({ name, email, password }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || "Registration failed. Please try again.");
+      if (error) {
+        setError(error.message);
         setIsLoading(false);
         return;
       }
 
-      // Registration successful, sign in the user
-      const signInResult = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      });
-
-      if (signInResult?.error) {
-        // Registration succeeded but auto-login failed
-        // Redirect to login page
-        router.push("/login?message=Account created successfully. Please sign in.");
-      } else {
-        router.push("/dashboard");
-      }
-    } catch (err) {
+      // Show email verification message
+      setEmailSent(true);
+    } catch {
       setError("An unexpected error occurred. Please try again.");
       setIsLoading(false);
     }
@@ -129,6 +127,45 @@ export default function RegisterPage() {
         <div className="w-full max-w-md">
           {/* Card */}
           <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-8">
+            {emailSent ? (
+              /* Email Verification Sent */
+              <div className="text-center">
+                <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-secondary-100 mb-4">
+                  <CheckCircle2 className="h-7 w-7 text-secondary-600" />
+                </div>
+                <h1 className="text-2xl font-bold text-neutral-900 mb-2">
+                  Verify your email
+                </h1>
+                <p className="text-neutral-600 mb-2">
+                  We&apos;ve sent a verification link to
+                </p>
+                <p className="font-medium text-neutral-900 mb-6">{email}</p>
+                <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 mb-6">
+                  <p className="text-sm text-primary-700">
+                    Click the link in your email to verify your account, then you can sign in.
+                  </p>
+                </div>
+                <p className="text-sm text-neutral-500 mb-6">
+                  Didn&apos;t receive the email? Check your spam folder or{" "}
+                  <button
+                    onClick={() => {
+                      setEmailSent(false);
+                      setError(null);
+                    }}
+                    className="text-primary-600 hover:underline font-medium"
+                  >
+                    try again
+                  </button>
+                </p>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/login">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Go to Sign In
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+            <>
             {/* Header */}
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-secondary-100 mb-4">
@@ -350,6 +387,8 @@ export default function RegisterPage() {
                 Sign in
               </Link>
             </p>
+            </>
+            )}
           </div>
         </div>
       </main>

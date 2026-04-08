@@ -3,7 +3,8 @@
 import * as React from "react";
 import NextLink from "next/link";
 import Image from "next/image";
-import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useSession } from "@/components/providers/SessionProvider";
 import {
   Menu,
   X,
@@ -38,16 +39,23 @@ export interface HeaderProps {
 
 const Header = React.forwardRef<HTMLElement, HeaderProps>(
   ({ className }, ref) => {
-    const { data: session, status } = useSession();
+    const { user, profile, status, signOut } = useSession();
+    const router = useRouter();
     const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
     const [userMenuOpen, setUserMenuOpen] = React.useState(false);
 
     const isLoggedIn = status === "authenticated";
     const isLoading = status === "loading";
 
+    const displayName = profile?.name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
+    const displayImage = profile?.image || user?.user_metadata?.avatar_url || null;
+    const displayEmail = user?.email || "";
+
     const handleLogout = async () => {
       setUserMenuOpen(false);
-      await signOut({ callbackUrl: "/" });
+      await signOut();
+      router.push("/");
+      router.refresh();
     };
 
     return (
@@ -94,10 +102,10 @@ const Header = React.forwardRef<HTMLElement, HeaderProps>(
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors"
                 >
-                  {session?.user?.image ? (
+                  {displayImage ? (
                     <Image
-                      src={session.user.image}
-                      alt={session.user.name || "User"}
+                      src={displayImage}
+                      alt={displayName}
                       width={32}
                       height={32}
                       className="h-8 w-8 rounded-full object-cover"
@@ -108,7 +116,7 @@ const Header = React.forwardRef<HTMLElement, HeaderProps>(
                     </div>
                   )}
                   <span className="text-sm font-medium text-neutral-700">
-                    {session?.user?.name?.split(" ")[0] || "User"}
+                    {displayName.split(" ")[0]}
                   </span>
                 </button>
 
@@ -123,10 +131,10 @@ const Header = React.forwardRef<HTMLElement, HeaderProps>(
                       <div className="p-2">
                         <div className="px-3 py-2 border-b border-neutral-100 mb-2">
                           <p className="font-medium text-neutral-900 truncate">
-                            {session?.user?.name}
+                            {displayName}
                           </p>
                           <p className="text-sm text-neutral-500 truncate">
-                            {session?.user?.email}
+                            {displayEmail}
                           </p>
                         </div>
                         <NextLink
@@ -220,10 +228,10 @@ const Header = React.forwardRef<HTMLElement, HeaderProps>(
               ) : isLoggedIn ? (
                 <>
                   <div className="flex items-center gap-3 px-3 py-2">
-                    {session?.user?.image ? (
+                    {displayImage ? (
                       <Image
-                        src={session.user.image}
-                        alt={session.user.name || "User"}
+                        src={displayImage}
+                        alt={displayName}
                         width={40}
                         height={40}
                         className="h-10 w-10 rounded-full object-cover"
@@ -235,10 +243,10 @@ const Header = React.forwardRef<HTMLElement, HeaderProps>(
                     )}
                     <div>
                       <p className="font-medium text-neutral-900">
-                        {session?.user?.name}
+                        {displayName}
                       </p>
                       <p className="text-sm text-neutral-500">
-                        {session?.user?.email}
+                        {displayEmail}
                       </p>
                     </div>
                   </div>

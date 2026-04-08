@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { connectDB } from "@/lib/mongodb";
-import { RateAlert } from "@/models/RateAlert";
+import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
 const createAlertSchema = z.object({
@@ -14,17 +12,20 @@ const createAlertSchema = z.object({
 // GET /api/alerts - Get all alerts for current user
 export async function GET() {
   try {
-    const session = await auth();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await connectDB();
+    const { data: alerts, error } = await supabase
+      .from("rate_alerts")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
 
-    const alerts = await RateAlert.find({
-      userId: session.user.id,
-    }).sort({ createdAt: -1 });
+    if (error) throw error;
 
     return NextResponse.json({ data: alerts });
   } catch (error) {
@@ -39,9 +40,10 @@ export async function GET() {
 // POST /api/alerts - Create new alert
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session?.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -58,19 +60,19 @@ export async function POST(request: NextRequest) {
     const { baseCurrency, targetCurrency, targetRate, direction } =
       validation.data;
 
-    await connectDB();
-
     // Check for existing similar alert
-    const existingAlert = await RateAlert.findOne({
-      userId: session.user.id,
-      baseCurrency,
-      targetCurrency,
-      targetRate,
-      direction,
-      isActive: true,
-    });
+    const { data: existing } = await supabase
+      .from("rate_alerts")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("base_currency", baseCurrency)
+      .eq("target_currency", targetCurrency)
+      .eq("target_rate", targetRate)
+      .eq("direction", direction)
+      .eq("is_active", true)
+      .maybeSingle();
 
-    if (existingAlert) {
+    if (existing) {
       return NextResponse.json(
         { error: "A similar alert already exists" },
         { status: 409 }
@@ -78,26 +80,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Limit number of active alerts per user
-    const activeAlertCount = await RateAlert.countDocuments({
-      userId: session.user.id,
-      isActive: true,
-    });
+    const { count } = await supabase
+      .from("rate_alerts")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("is_active", true);
 
-    if (activeAlertCount >= 10) {
+    if (count !== null && count >= 10) {
       return NextResponse.json(
         { error: "Maximum 10 active alerts allowed" },
         { status: 400 }
       );
     }
 
-    const alert = await RateAlert.create({
-      userId: session.user.id,
-      currencyPair: `${baseCurrency}/${targetCurrency}`,
-      baseCurrency,
-      targetCurrency,
-      targetRate,
-      direction,
-    });
+    const { data: alert, error } = await supabase
+      .from("rate_alerts")
+      .insert({
+        user_id: user.id,
+        currency_pair: `${baseCurrency}/${targetCurrency}`,
+        base_currency: baseCurrency,
+        target_currency: targetCurrency,
+        target_rate: targetRate,
+        direction,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json({ data: alert }, { status: 201 });
   } catch (error) {

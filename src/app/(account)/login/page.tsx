@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { createClient } from "@/lib/supabase/client";
 import { Eye, EyeOff, Mail, Lock, ArrowRight, AlertCircle } from "lucide-react";
 import { Header } from "@/components/organisms/Header";
 import { Footer } from "@/components/organisms/Footer";
@@ -47,18 +47,11 @@ export default function LoginPage() {
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  const supabase = createClient();
+
   React.useEffect(() => {
     if (errorParam) {
-      switch (errorParam) {
-        case "OAuthAccountNotLinked":
-          setError("This email is already associated with another account. Please sign in with your email and password.");
-          break;
-        case "CredentialsSignin":
-          setError("Invalid email or password.");
-          break;
-        default:
-          setError("An error occurred during sign in. Please try again.");
-      }
+      setError("An error occurred during sign in. Please try again.");
     }
   }, [errorParam]);
 
@@ -66,8 +59,14 @@ export default function LoginPage() {
     setIsGoogleLoading(true);
     setError(null);
     try {
-      await signIn("google", { callbackUrl });
-    } catch (err) {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(callbackUrl)}`,
+        },
+      });
+      if (error) throw error;
+    } catch {
       setError("Failed to sign in with Google. Please try again.");
       setIsGoogleLoading(false);
     }
@@ -79,19 +78,19 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const result = await signIn("credentials", {
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
-        redirect: false,
       });
 
-      if (result?.error) {
-        setError(result.error);
+      if (error) {
+        setError(error.message);
         setIsLoading(false);
       } else {
         router.push(callbackUrl);
+        router.refresh();
       }
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
       setIsLoading(false);
     }

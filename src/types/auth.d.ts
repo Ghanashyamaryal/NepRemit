@@ -1,21 +1,18 @@
-import { DefaultSession, DefaultUser } from "next-auth";
-import { DefaultJWT } from "next-auth/jwt";
+// Supabase Auth types are provided by @supabase/supabase-js
+// This file is kept for any custom auth type extensions
 
-declare module "next-auth" {
-  interface Session extends DefaultSession {
-    user: {
-      id: string;
-    } & DefaultSession["user"];
-  }
-
-  interface User extends DefaultUser {
-    id: string;
-  }
-}
-
-declare module "next-auth/jwt" {
-  interface JWT extends DefaultJWT {
-    userId?: string;
-    rememberMe?: boolean;
-  }
+export interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  image: string | null;
+  phone: string | null;
+  country: string;
+  default_currency: string;
+  notifications_rate_alerts: boolean;
+  notifications_weekly_digest: boolean;
+  notifications_promotions: boolean;
+  notifications_product_updates: boolean;
+  created_at: string;
+  updated_at: string;
 }
