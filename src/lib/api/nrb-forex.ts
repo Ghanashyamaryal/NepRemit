@@ -96,8 +96,11 @@ export async function fetchNRBForexRates(): Promise<NRBForexPayload | null> {
       return null;
     }
 
-    // Return the most recent rate (first in the list)
-    return data.data.payload[0];
+    // NRB returns rates in ascending date order — pick the latest published entry
+    const latest = [...data.data.payload].sort((a, b) =>
+      b.date.localeCompare(a.date)
+    )[0];
+    return latest;
   } catch (error) {
     console.error("Failed to fetch NRB forex rates:", error);
     return null;

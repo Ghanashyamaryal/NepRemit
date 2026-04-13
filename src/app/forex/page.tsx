@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import {
   Clock,
-  RefreshCw,
-  Download,
-  AlertCircle,
   BarChart3,
   TrendingUp,
   TrendingDown,
@@ -12,7 +9,6 @@ import {
 import { Header } from "@/components/organisms/Header";
 import { Footer } from "@/components/organisms/Footer";
 import { Badge } from "@/components/atoms/Badge";
-import { Button } from "@/components/atoms/Button";
 import {
   Card,
   CardContent,
@@ -29,6 +25,7 @@ import {
   ForexCharts,
   MultiCurrencyComparison,
 } from "./_components/ForexCharts";
+import { ForexActions } from "./_components/ForexActions";
 
 export const metadata: Metadata = {
   title: "Nepal Forex Rates - Live NRB Currency Exchange Rates NPR",
@@ -239,36 +236,13 @@ export default async function ForexPage() {
                   Official exchange rates from Nepal Rastra Bank (NRB)
                 </Text>
               </div>
-              <div className="flex items-center gap-3">
-                <Button variant="outline-dark" size="sm">
-                  <Download className="h-4 w-4" />
-                  Download CSV
-                </Button>
-                <Button variant="outline-dark" size="sm">
-                  <RefreshCw className="h-4 w-4" />
-                  Refresh
-                </Button>
-              </div>
+              <ForexActions
+                rates={ratesWithChange}
+                publishedAt={lastUpdated}
+              />
             </div>
           </div>
         </section>
-
-        {/* API Source Info */}
-        {isLive && (
-          <section className="bg-secondary-50 border-b border-secondary-200 py-3">
-            <div className="container">
-              <div className="flex items-center gap-2 text-sm text-secondary-700">
-                <AlertCircle className="h-4 w-4" />
-                <span>
-                  Data fetched from official NRB API:{" "}
-                  <code className="bg-secondary-100 px-1.5 py-0.5 rounded text-xs">
-                    https://www.nrb.org.np/api/forex/v1/rates
-                  </code>
-                </span>
-              </div>
-            </div>
-          </section>
-        )}
 
         {/* Major Currencies - Horizontal Scrollable */}
         <section className="py-6">
